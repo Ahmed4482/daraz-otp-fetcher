@@ -10,6 +10,7 @@ const { exec } = require('child_process');
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
 // Credentials path - works for both local and Render deployment
+// Render secret files are at /etc/secrets/ at runtime
 const CREDENTIALS_PATH = process.env.GOOGLE_CREDENTIALS_PATH 
   || (fs.existsSync('/etc/secrets/credentials.json') 
       ? '/etc/secrets/credentials.json' 
@@ -54,9 +55,24 @@ setInterval(() => {
 }, 60000); // Check every minute
 
 // Get token path for a specific account
+// Checks Render's secret files location first, then local backend folder
 function getTokenPath(email) {
   const safeEmail = email.replace(/[@.]/g, '_');
-  return path.join(__dirname, `token_${safeEmail}.json`);
+  const tokenFileName = `token_${safeEmail}.json`;
+  
+  // Render secret files location (production)
+  const renderSecretPath = path.join('/etc/secrets', tokenFileName);
+  
+  // Local development path
+  const localPath = path.join(__dirname, tokenFileName);
+  
+  // Check if Render secret file exists
+  if (fs.existsSync(renderSecretPath)) {
+    return renderSecretPath;
+  }
+  
+  // Otherwise use local path
+  return localPath;
 }
 
 /**
