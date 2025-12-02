@@ -1,10 +1,4 @@
 // backend/auth.js
-// Handles Gmail API OAuth2 authentication using googleapis library.
-// - Loads credentials from credentials.json
-// - On first run, opens browser for OAuth consent
-// - Saves token.json for future authenticated calls
-// - Automatically handles token refresh using googleapis
-
 const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
@@ -15,8 +9,22 @@ const { exec } = require('child_process');
 // If modifying these scopes, delete token.json and re-authorize.
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly'];
 
-// Paths for credentials.json and token.json
-const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
+// Credentials path - works for both local and Render deployment
+const CREDENTIALS_PATH = process.env.GOOGLE_CREDENTIALS_PATH 
+  || (fs.existsSync('/etc/secrets/credentials.json') 
+      ? '/etc/secrets/credentials.json' 
+      : path.join(__dirname, 'credentials.json'));
+
+// Token path helper - adapts to environment
+const getTokenFilePath = (email) => {
+  const tokenName = `token_${email.replace(/[@.]/g, '_')}.json`;
+  
+  if (process.env.NODE_ENV === 'production') {
+    return `/etc/secrets/${tokenName}`;
+  }
+  
+  return path.join(__dirname, tokenName);
+};
 
 // Account configurations
 const ACCOUNTS = [
@@ -27,6 +35,7 @@ const ACCOUNTS = [
   { email: 'hkdigitalhub7@gmail.com', name: 'HK Digital Hub' },
 ];
 
+// ... rest of your code
 // Store pending OAuth clients (for automatic token exchange)
 // Key: email, Value: { oAuth2Client, resolve, reject, timestamp }
 const pendingAuths = new Map();
