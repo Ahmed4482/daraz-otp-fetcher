@@ -1,0 +1,30 @@
+{
+  "name": "daraz-otp-fetcher",
+  "version": "1.0.0",
+  "description": "Simple web application to fetch Daraz pickup OTPs from Gmail using Gmail API.",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "keywords": [
+    "gmail",
+    "daraz",
+    "otp",
+    "express",
+    "googleapis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "googleapis": "^144.0.0",
+    "open": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
+
+

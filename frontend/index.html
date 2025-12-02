@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daraz OTP Fetcher</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <h1>Daraz OTP Fetcher</h1>
+        <p class="subtitle">Fetch your latest Daraz pickup OTPs directly from Gmail.</p>
+      </header>
+
+      <main>
+        <section class="controls">
+          <button id="fetchBtn" class="primary-btn">
+            <span class="btn-text">Fetch Latest OTPs</span>
+            <svg class="btn-border" width="100%" height="100%">
+              <rect class="border-rect" x="0" y="0" width="100%" height="100%" rx="6" />
+            </svg>
+          </button>
+          <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <span>Fetching OTPs from Gmail...</span>
+          </div>
+          <div id="message" class="message"></div>
+        </section>
+
+        <section class="table-section">
+          <div class="table-wrapper">
+            <table id="otpTable">
+              <thead>
+                <tr>
+                  <th>Store Name</th>
+                  <th>OTP</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="otpTableBody">
+                <!-- Rows will be injected by script.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <span>Connected to Gmail using secure OAuth 2.0.</span>
+      </footer>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="script.js"></script>
+  </body>
+  </html>
+
+
