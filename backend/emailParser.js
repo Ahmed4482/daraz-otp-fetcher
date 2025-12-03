@@ -25,18 +25,57 @@ function decodeBase64Url(data) {
 }
 
 /**
+ * Strip HTML tags from a string and decode HTML entities.
+ */
+function stripHtmlTags(html) {
+  return html
+    .replace(/<style[^>]*>.*?<\/style>/gis, '')
+    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Recursively extract the plain text body from a Gmail message payload.
+ * First tries to find text/plain, then falls back to text/html with tags stripped.
  */
 function extractPlainTextFromPayload(payload) {
   if (!payload) return '';
 
-  // If this part has a body and mimeType is text/plain
+  // First priority: if this part has a body and mimeType is text/plain
   if (payload.mimeType === 'text/plain' && payload.body && payload.body.data) {
     return decodeBase64Url(payload.body.data);
   }
 
-  // If this is multipart, search its parts
+  // Second priority: if this part is text/html, extract and strip tags
+  if (payload.mimeType === 'text/html' && payload.body && payload.body.data) {
+    const htmlContent = decodeBase64Url(payload.body.data);
+    return stripHtmlTags(htmlContent);
+  }
+
+  // If this is multipart, search its parts recursively
   if (payload.parts && payload.parts.length) {
+    // First pass: look for text/plain
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/plain' && part.body && part.body.data) {
+        return decodeBase64Url(part.body.data);
+      }
+    }
+
+    // Second pass: look for text/html and strip tags
+    for (const part of payload.parts) {
+      if (part.mimeType === 'text/html' && part.body && part.body.data) {
+        const htmlContent = decodeBase64Url(part.body.data);
+        return stripHtmlTags(htmlContent);
+      }
+    }
+
+    // Third pass: recurse into nested parts
     for (const part of payload.parts) {
       const text = extractPlainTextFromPayload(part);
       if (text) return text;

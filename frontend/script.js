@@ -78,10 +78,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const storeTd = document.createElement('td');
       storeTd.textContent = item.storeName || '';
 
-      const emailTd = document.createElement('td');
-      emailTd.textContent = item.accountEmail || 'Unknown';
-      emailTd.classList.add('account-cell');
-
       const otpTd = document.createElement('td');
       otpTd.textContent = item.otp || 'N/A';
       otpTd.classList.add('otp-cell');
@@ -95,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
       timeTd.textContent = formatTime(item.timeReceived);
 
       tr.appendChild(storeTd);
-      tr.appendChild(emailTd);
       tr.appendChild(otpTd);
       tr.appendChild(dateTd);
       tr.appendChild(timeTd);
