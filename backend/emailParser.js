@@ -6,9 +6,11 @@
 const { google } = require('googleapis');
 
 // Gmail search parameters
-// Search for OTP emails from any sender (not just noreply@support.daraz.pk)
-const SEARCH_QUERY =
-  'subject:"OTP for Package Pickup" newer_than:7d';
+// Only inspect the three most recent received emails in the inbox
+const SEARCH_QUERY = 'in:inbox';
+
+// Only log debug info for this specific account
+const DEBUG_EMAIL = 'mtfdigitalemporium@gmail.com';
 
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
@@ -95,7 +97,7 @@ function parseEmailBody(body) {
       pickupLocation = locationMatch[1].trim();
     }
   } catch (err) {
-    console.error('Error parsing email body:', err);
+    // Swallow parse errors silently to avoid noisy logs
   }
 
   return {
@@ -122,16 +124,17 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
       userId: 'me',
       q: SEARCH_QUERY,
       maxResults: MAX_EMAILS,
+      labelIds: ['INBOX'], // ensure we only inspect received messages
     });
 
-    const messages = listResponse.data.messages || [];
+    const messages = (listResponse.data.messages || []).slice(0, MAX_EMAILS);
     if (messages.length === 0) {
       return [];
     }
 
     const results = [];
 
-    // Fetch each message in full format
+    // Fetch each message in full format (these are already the 3 most recent)
     for (const msg of messages) {
       try {
         const msgResponse = await gmail.users.messages.get({
@@ -142,25 +145,51 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
         const { payload, internalDate } = msgResponse.data;
 
-        const bodyText = extractPlainTextFromPayload(payload);
-        
-        // Debug: log body text if OTP parsing fails
-        if (!bodyText || bodyText.length === 0) {
-          const accountInfo = accountEmail ? ` [Account: ${accountName || accountEmail}]` : '';
-          console.log(`Warning: Empty email body extracted${accountInfo}`);
+        // Extract subject (for optional debug logging)
+        let subject = '(no subject)';
+        if (payload && Array.isArray(payload.headers)) {
+          const subjHeader = payload.headers.find(
+            (h) => h.name && h.name.toLowerCase() === 'subject'
+          );
+          if (subjHeader && subjHeader.value) {
+            subject = subjHeader.value;
+          }
         }
-        
+
+        // Only log for the akdigitalden account, and nothing else
+        if (accountEmail === DEBUG_EMAIL) {
+          const receivedIso = internalDate
+            ? new Date(parseInt(internalDate, 10)).toISOString()
+            : 'unknown date';
+          console.log(
+            `[DEBUG] Recent inbox email for ${accountEmail}: "${subject}" at ${receivedIso}`
+          );
+        }
+
+        const bodyText = extractPlainTextFromPayload(payload);
+
         const parsed = parseEmailBody(bodyText);
-        
-        // Debug: log if OTP not found
-        if (!parsed.otp) {
-          const accountInfo = accountEmail ? ` [Account: ${accountName || accountEmail}]` : '';
-          console.log(`OTP not found${accountInfo}. Body snippet:`, bodyText.substring(0, 300));
-          // Try to find any 6-digit number in the body as fallback
-          const anySixDigit = bodyText.match(/\b(\d{6})\b/);
-          if (anySixDigit) {
-            console.log(`Found 6-digit number in body (potential OTP): ${anySixDigit[1]}${accountInfo}`);
-            parsed.otp = anySixDigit[1];
+
+        // For the debug account, log body and warnings if something is off
+        if (accountEmail === DEBUG_EMAIL) {
+          if (!bodyText || bodyText.length === 0) {
+            console.log(
+              `[DEBUG] Warning: Empty email body extracted for ${accountEmail}`
+            );
+          } else {
+            console.log(
+              `[DEBUG] Full email body for ${accountEmail} (subject: "${subject}"):\n` +
+                '----- BODY START -----\n' +
+                bodyText +
+                '\n----- BODY END -----'
+            );
+          }
+
+          if (!parsed.otp) {
+            console.log(
+              `[DEBUG] Warning: No OTP extracted for ${accountEmail}. Body snippet:`,
+              bodyText ? bodyText.substring(0, 300) : '(empty body)'
+            );
           }
         }
 
@@ -178,7 +207,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           rawSnippet: bodyText.slice(0, 500), // helpful for debugging in frontend if needed
         });
       } catch (err) {
-        console.error('Error fetching or parsing message:', err);
+        // Swallow per-message errors silently to keep console clean
       }
     }
 
