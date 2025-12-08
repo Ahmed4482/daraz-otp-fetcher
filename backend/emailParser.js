@@ -10,7 +10,7 @@ const { google } = require('googleapis');
 const SEARCH_QUERY = 'in:inbox';
 
 // Only log debug info for this specific account
-const DEBUG_EMAIL = 'akdigitalden@gmail.com';
+const DEBUG_EMAIL = 'muhammadrraahimsikander@gmail.com';
 
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;

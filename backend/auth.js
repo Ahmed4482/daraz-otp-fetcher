@@ -34,6 +34,9 @@ const ACCOUNTS = [
   { email: 'mtfdigitalemporium@gmail.com', name: 'MTF Digital Emporium' },
   { email: 'mtfdigitalemporiumofficial@gmail.com', name: 'MTF Digital Emporium Official' },
   { email: 'hkdigitalhub7@gmail.com', name: 'HK Digital Hub' },
+  { email: 'sarlzsikander@gmail.com', name: 'SARLZ' },
+  { email: 'premiumcollection1983@gmail.com', name: 'Premium Collection' },
+  { email: 'muhammadrraahimsikander@gmail.com', name: 'The pen Heaven' },
 ];
 
 // ... rest of your code
