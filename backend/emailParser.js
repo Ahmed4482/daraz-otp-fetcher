@@ -10,7 +10,7 @@ const { google } = require('googleapis');
 const SEARCH_QUERY = 'in:inbox';
 
 // Only log debug info for this specific account
-const DEBUG_EMAIL = 'mtfdigitalemporium@gmail.com';
+const DEBUG_EMAIL = 'akdigitalden@gmail.com';
 
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
@@ -173,7 +173,8 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
     const results = [];
 
-    // Fetch each message in full format (these are already the 3 most recent)
+    // Step 1: Fetch each message and check if it's an OTP email
+    // Step 2: Only process emails with subject "OTP for Package Pickup"
     for (const msg of messages) {
       try {
         const msgResponse = await gmail.users.messages.get({
@@ -184,7 +185,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
         const { payload, internalDate } = msgResponse.data;
 
-        // Extract subject (for optional debug logging)
+        // Extract subject first to check if this is an OTP email
         let subject = '(no subject)';
         if (payload && Array.isArray(payload.headers)) {
           const subjHeader = payload.headers.find(
@@ -195,7 +196,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           }
         }
 
-        // Only log for the akdigitalden account, and nothing else
+        // Only log for the debug account
         if (accountEmail === DEBUG_EMAIL) {
           const receivedIso = internalDate
             ? new Date(parseInt(internalDate, 10)).toISOString()
@@ -205,6 +206,17 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           );
         }
 
+        // FILTER: Only process emails with subject "OTP for Package Pickup"
+        if (!subject.toLowerCase().includes('otp for package pickup')) {
+          if (accountEmail === DEBUG_EMAIL) {
+            console.log(
+              `[DEBUG] Skipping email "${subject}" - not an OTP for Package Pickup email`
+            );
+          }
+          continue; // Skip this email, move to next one
+        }
+
+        // This email has the correct subject, now extract and parse the body
         const bodyText = extractPlainTextFromPayload(payload);
 
         const parsed = parseEmailBody(bodyText);
