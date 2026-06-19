@@ -14,6 +14,49 @@ const DEBUG_EMAIL = 'muhammadrraahimsikander@gmail.com';
 
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
+const GMAIL_API_RETRIES = 3;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientGmailError(err) {
+  const code = err && (err.code || err.status);
+  const message = err && (err.message || '');
+
+  return (
+    code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+    code === 'ECONNRESET' ||
+    code === 'ETIMEDOUT' ||
+    code === 429 ||
+    (typeof code === 'number' && code >= 500) ||
+    message.includes('Premature close')
+  );
+}
+
+async function retryGmailRequest(requestFn, label) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= GMAIL_API_RETRIES; attempt += 1) {
+    try {
+      return await requestFn();
+    } catch (err) {
+      lastError = err;
+      if (!isTransientGmailError(err) || attempt === GMAIL_API_RETRIES) {
+        throw err;
+      }
+
+      const delayMs = attempt * 500;
+      console.warn(
+        `Transient Gmail API error during ${label}; retrying in ${delayMs}ms ` +
+          `(${attempt}/${GMAIL_API_RETRIES})`
+      );
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
 
 /**
  * Decode a base64url-encoded string to UTF-8.
@@ -159,12 +202,16 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
   try {
     // Search for messages using query
-    const listResponse = await gmail.users.messages.list({
-      userId: 'me',
-      q: SEARCH_QUERY,
-      maxResults: MAX_EMAILS,
-      labelIds: ['INBOX'], // ensure we only inspect received messages
-    });
+    const listResponse = await retryGmailRequest(
+      () =>
+        gmail.users.messages.list({
+          userId: 'me',
+          q: SEARCH_QUERY,
+          maxResults: MAX_EMAILS,
+          labelIds: ['INBOX'], // ensure we only inspect received messages
+        }),
+      `message list for ${accountEmail || 'account'}`
+    );
 
     const messages = (listResponse.data.messages || []).slice(0, MAX_EMAILS);
     if (messages.length === 0) {
@@ -177,11 +224,15 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     // Step 2: Only process emails with subject "OTP for Package Pickup"
     for (const msg of messages) {
       try {
-        const msgResponse = await gmail.users.messages.get({
-          userId: 'me',
-          id: msg.id,
-          format: 'full',
-        });
+        const msgResponse = await retryGmailRequest(
+          () =>
+            gmail.users.messages.get({
+              userId: 'me',
+              id: msg.id,
+              format: 'full',
+            }),
+          `message fetch for ${accountEmail || 'account'}`
+        );
 
         const { payload, internalDate } = msgResponse.data;
 
