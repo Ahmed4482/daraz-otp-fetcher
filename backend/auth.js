@@ -38,6 +38,7 @@ const ACCOUNTS = [
   { email: 'premiumcollection1983@gmail.com', name: 'Premium Collection' },
   { email: 'muhammadrraahimsikander@gmail.com', name: 'The pen Heaven' },
   { email: 'darazumotp@gmail.com', name: 'UM Treasures' },
+  { email: 'bintesikanderpervez@gmail.com', name: 'HK Digital Empire' },
 ];
 
 // ... rest of your code
