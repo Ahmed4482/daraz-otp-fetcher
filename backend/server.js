@@ -3,6 +3,15 @@
 // - Serves the frontend
 // - Exposes an API endpoint to fetch parsed OTP emails from Gmail
 
+// Force IPv4-first DNS resolution. On Render, the default IPv6 path to Google
+// (oauth2.googleapis.com / gmail.googleapis.com) drops connections mid-stream,
+// causing ERR_STREAM_PREMATURE_CLOSE during token refresh. This must run before
+// any outbound HTTPS request is made.
+const dns = require('dns');
+if (typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
