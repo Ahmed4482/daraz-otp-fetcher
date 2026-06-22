@@ -163,7 +163,32 @@ function loadOAuthClient() {
   }
 
   console.log(`Using redirect URI: ${redirectUri}`);
-  return new google.auth.OAuth2(client_id, client_secret, redirectUri);
+  const client = new google.auth.OAuth2(client_id, client_secret, redirectUri);
+  return disableGzipOnTransporter(client);
+}
+
+/**
+ * Force `Accept-Encoding: identity` on every request this OAuth2 client makes,
+ * including the internal token refresh to https://oauth2.googleapis.com/token.
+ *
+ * On Render, the gzip response stream from Google is cut short, and node-fetch
+ * (used by gaxios) throws ERR_STREAM_PREMATURE_CLOSE while decompressing. Asking
+ * for an uncompressed body removes the Gunzip step and avoids the crash.
+ */
+function disableGzipOnTransporter(client) {
+  const transporter = client.transporter;
+  if (!transporter || typeof transporter.request !== 'function') {
+    return client;
+  }
+
+  const originalRequest = transporter.request.bind(transporter);
+  transporter.request = (opts, callback) => {
+    opts = opts || {};
+    opts.headers = { ...(opts.headers || {}), 'Accept-Encoding': 'identity' };
+    return originalRequest(opts, callback);
+  };
+
+  return client;
 }
 
 /**

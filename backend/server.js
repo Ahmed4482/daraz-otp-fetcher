@@ -15,7 +15,6 @@ if (typeof dns.setDefaultResultOrder === 'function') {
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
-const { google } = require('googleapis');
 const { getAllAuthorizedClients, exchangeCodeForToken } = require('./auth');
 const { fetchDarazOtpEmails } = require('./emailParser');
 
@@ -282,44 +281,24 @@ app.get('/api/otps', async (req, res) => {
       });
     }
 
-    // Fetch OTPs from all accounts in parallel
+    // Fetch OTPs one account at a time. Processing all accounts in parallel
+    // opens ~20 simultaneous TLS connections to Google from Render, which
+    // triggers ERR_STREAM_PREMATURE_CLOSE. Sequential processing avoids the burst.
     const allOtps = [];
-    const fetchPromises = clients.map(async (clientInfo) => {
+    for (const clientInfo of clients) {
       try {
-        try {
-          const gmail = google.gmail({ version: 'v1', auth: clientInfo.auth });
-          const profile = await gmail.users.getProfile({ userId: 'me' });
-          console.log(
-            `[OTP] Configured ${clientInfo.email} -> Gmail profile ` +
-              `${profile.data.emailAddress || 'unknown'} ` +
-              `(messagesTotal: ${profile.data.messagesTotal})`
-          );
-        } catch (profileError) {
-          console.error(
-            `[OTP] Failed to read Gmail profile for ${clientInfo.email}:`,
-            profileError.message
-          );
-        }
-
         const otps = await fetchDarazOtpEmails(
           clientInfo.auth,
           clientInfo.email,
           clientInfo.name
         );
         console.log(`[OTP] ${clientInfo.email}: returning ${otps.length} OTP records`);
-        return otps;
+        allOtps.push(...otps);
       } catch (error) {
         console.error(`Error fetching from ${clientInfo.email}:`, error.message);
-        return []; // Return empty array if one account fails
+        // Continue with other accounts even if one fails
       }
-    });
-
-    const results = await Promise.all(fetchPromises);
-    
-    // Combine all results
-    results.forEach((otps) => {
-      allOtps.push(...otps);
-    });
+    }
 
     // Sort all OTPs by time (newest first)
     allOtps.sort((a, b) => {
