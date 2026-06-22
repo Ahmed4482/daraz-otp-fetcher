@@ -15,8 +15,18 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// API responses must always be fresh because OTP inbox data changes frequently.
+app.set('etag', false);
+
 // Middleware to parse JSON bodies (not strictly needed here but useful)
 app.use(express.json());
+
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // CORS middleware for production (allow frontend to call backend)
 app.use((req, res, next) => {
