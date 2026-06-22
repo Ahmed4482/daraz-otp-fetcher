@@ -59,6 +59,11 @@ setInterval(() => {
   }
 }, 60000); // Check every minute
 
+// True when running on Render (Render sets RENDER=true) or explicitly in production.
+// Used to avoid the interactive browser OAuth flow on a headless server.
+const IS_HEADLESS_SERVER =
+  process.env.RENDER === 'true' || process.env.NODE_ENV === 'production';
+
 // Get token path for a specific account
 // Checks Render's secret files location first, then local backend folder
 function getTokenPath(email) {
@@ -109,6 +114,10 @@ function writeJsonFile(filePath, data) {
  * Load client secrets from a local file and return an OAuth2 client.
  */
 function loadOAuthClient() {
+  console.log(
+    `[AUTH] Loading credentials from: ${CREDENTIALS_PATH} ` +
+      `(exists: ${fs.existsSync(CREDENTIALS_PATH)})`
+  );
   const credentials = readJsonFile(CREDENTIALS_PATH);
   if (!credentials) {
     throw new Error(
@@ -264,13 +273,31 @@ async function getAuthorizedClient(email) {
 
   // Load token if it exists
   const tokenPath = getTokenPath(email);
+  const tokenExists = fs.existsSync(tokenPath);
+  console.log(
+    `[AUTH] ${email}: token path ${tokenPath} (exists: ${tokenExists})`
+  );
+
   const token = readJsonFile(tokenPath);
   if (token) {
+    const hasRefresh = Boolean(token.refresh_token);
+    console.log(
+      `[AUTH] ${email}: token loaded (has refresh_token: ${hasRefresh})`
+    );
     oAuth2Client.setCredentials(token);
     return oAuth2Client;
   }
 
-  // Otherwise, get a new token via OAuth flow
+  // On a headless server (Render) we cannot open a browser for OAuth.
+  // Fail loudly so the logs show the missing token instead of hanging.
+  if (IS_HEADLESS_SERVER) {
+    throw new Error(
+      `No token file found for ${email} at ${tokenPath}. ` +
+        'Add the token as a Render Secret File and redeploy.'
+    );
+  }
+
+  // Local development: get a new token via interactive OAuth flow
   console.log(`\n=== Authenticating account: ${email} ===`);
   return await getNewToken(oAuth2Client, email);
 }
@@ -281,7 +308,13 @@ async function getAuthorizedClient(email) {
  */
 async function getAllAuthorizedClients() {
   const clients = [];
-  
+
+  console.log(
+    `[AUTH] Environment: NODE_ENV=${process.env.NODE_ENV || '(unset)'} ` +
+      `RENDER=${process.env.RENDER || '(unset)'} headless=${IS_HEADLESS_SERVER}`
+  );
+  console.log(`[AUTH] Configured accounts: ${ACCOUNTS.length}`);
+
   for (const account of ACCOUNTS) {
     try {
       const auth = await getAuthorizedClient(account.email);
@@ -291,11 +324,12 @@ async function getAllAuthorizedClients() {
         auth: auth,
       });
     } catch (error) {
-      console.error(`Failed to authenticate ${account.email}:`, error.message);
+      console.error(`[AUTH] Failed to authenticate ${account.email}:`, error.message);
       // Continue with other accounts even if one fails
     }
   }
-  
+
+  console.log(`[AUTH] Authorized ${clients.length}/${ACCOUNTS.length} accounts`);
   return clients;
 }
 

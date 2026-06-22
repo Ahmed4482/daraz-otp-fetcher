@@ -9,8 +9,11 @@ const { google } = require('googleapis');
 // Only inspect the three most recent received emails in the inbox
 const SEARCH_QUERY = 'in:inbox';
 
-// Only log debug info for this specific account
+// Only log full email body debug info for this specific account
 const DEBUG_EMAIL = 'muhammadrraahimsikander@gmail.com';
+// Always print high-level [OTP] diagnostics so production (Render) logs reveal issues.
+// NODE_ENV may be unset on Render, so we do NOT gate these behind it.
+const SHOULD_LOG_OTP_DEBUG = true;
 
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
@@ -220,6 +223,10 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     );
 
     const messages = (listResponse.data.messages || []).slice(0, MAX_EMAILS);
+    if (SHOULD_LOG_OTP_DEBUG) {
+      console.log(`[OTP] ${accountEmail || 'account'}: listed ${messages.length} recent inbox messages`);
+    }
+
     if (messages.length === 0) {
       return [];
     }
@@ -253,8 +260,8 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           }
         }
 
-        // Only log for the debug account
-        if (accountEmail === DEBUG_EMAIL) {
+        // Only log full diagnostics when debugging locally or in production logs.
+        if (accountEmail === DEBUG_EMAIL || SHOULD_LOG_OTP_DEBUG) {
           const receivedIso = internalDate
             ? new Date(parseInt(internalDate, 10)).toISOString()
             : 'unknown date';
@@ -265,7 +272,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
         // FILTER: Only process emails with subject "OTP for Package Pickup"
         if (!subject.toLowerCase().includes('otp for package pickup')) {
-          if (accountEmail === DEBUG_EMAIL) {
+          if (accountEmail === DEBUG_EMAIL || SHOULD_LOG_OTP_DEBUG) {
             console.log(
               `[DEBUG] Skipping email "${subject}" - not an OTP for Package Pickup email`
             );
@@ -278,8 +285,8 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
         const parsed = parseEmailBody(bodyText);
 
-        // For the debug account, log body and warnings if something is off
-        if (accountEmail === DEBUG_EMAIL) {
+        // Full email bodies can contain OTPs, so only log them during explicit local debugging.
+        if (accountEmail === DEBUG_EMAIL && process.env.OTP_DEBUG === 'true') {
           if (!bodyText || bodyText.length === 0) {
             console.log(
               `[DEBUG] Warning: Empty email body extracted for ${accountEmail}`
@@ -323,6 +330,11 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     const validResults = results.filter(
       (item) => item.storeName && item.otp && item.timeReceived
     );
+    if (SHOULD_LOG_OTP_DEBUG) {
+      console.log(
+        `[OTP] ${accountEmail || 'account'}: parsed ${validResults.length} valid OTP emails`
+      );
+    }
 
     // Sort newest first by timeReceived
     validResults.sort((a, b) => {
@@ -332,7 +344,11 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
 
     return validResults;
   } catch (err) {
-    console.error('Error listing Gmail messages:', err);
+    console.error(
+      `[OTP] Error listing Gmail messages for ${accountEmail || 'account'} ` +
+        `(code: ${err && (err.code || err.status)}):`,
+      err && err.message ? err.message : err
+    );
     throw new Error('Failed to list Gmail messages');
   }
 }

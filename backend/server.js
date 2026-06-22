@@ -6,6 +6,7 @@
 const express = require('express');
 const path = require('path');
 const dotenv = require('dotenv');
+const { google } = require('googleapis');
 const { getAllAuthorizedClients, exchangeCodeForToken } = require('./auth');
 const { fetchDarazOtpEmails } = require('./emailParser');
 
@@ -263,6 +264,7 @@ app.get('/api/otps', async (req, res) => {
   try {
     // Get authorized Gmail API clients for all accounts
     const clients = await getAllAuthorizedClients();
+    console.log(`[OTP] Authorized ${clients.length} Gmail clients`);
 
     if (clients.length === 0) {
       return res.status(500).json({
@@ -275,11 +277,27 @@ app.get('/api/otps', async (req, res) => {
     const allOtps = [];
     const fetchPromises = clients.map(async (clientInfo) => {
       try {
+        try {
+          const gmail = google.gmail({ version: 'v1', auth: clientInfo.auth });
+          const profile = await gmail.users.getProfile({ userId: 'me' });
+          console.log(
+            `[OTP] Configured ${clientInfo.email} -> Gmail profile ` +
+              `${profile.data.emailAddress || 'unknown'} ` +
+              `(messagesTotal: ${profile.data.messagesTotal})`
+          );
+        } catch (profileError) {
+          console.error(
+            `[OTP] Failed to read Gmail profile for ${clientInfo.email}:`,
+            profileError.message
+          );
+        }
+
         const otps = await fetchDarazOtpEmails(
           clientInfo.auth,
           clientInfo.email,
           clientInfo.name
         );
+        console.log(`[OTP] ${clientInfo.email}: returning ${otps.length} OTP records`);
         return otps;
       } catch (error) {
         console.error(`Error fetching from ${clientInfo.email}:`, error.message);
