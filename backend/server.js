@@ -272,7 +272,6 @@ app.get('/api/otps', async (req, res) => {
   try {
     // Get authorized Gmail API clients for all accounts
     const clients = await getAllAuthorizedClients();
-    console.log(`[OTP] Authorized ${clients.length} Gmail clients`);
 
     if (clients.length === 0) {
       return res.status(500).json({
@@ -292,7 +291,6 @@ app.get('/api/otps', async (req, res) => {
           clientInfo.email,
           clientInfo.name
         );
-        console.log(`[OTP] ${clientInfo.email}: returning ${otps.length} OTP records`);
         allOtps.push(...otps);
       } catch (error) {
         console.error(`Error fetching from ${clientInfo.email}:`, error.message);

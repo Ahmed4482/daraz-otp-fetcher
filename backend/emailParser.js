@@ -9,12 +9,6 @@ const { google } = require('googleapis');
 // Only inspect the three most recent received emails in the inbox
 const SEARCH_QUERY = 'in:inbox';
 
-// Only log full email body debug info for this specific account
-const DEBUG_EMAIL = 'muhammadrraahimsikander@gmail.com';
-// Always print high-level [OTP] diagnostics so production (Render) logs reveal issues.
-// NODE_ENV may be unset on Render, so we do NOT gate these behind it.
-const SHOULD_LOG_OTP_DEBUG = true;
-
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
 const GMAIL_API_RETRIES = 3;
@@ -217,10 +211,6 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     );
 
     const messages = (listResponse.data.messages || []).slice(0, MAX_EMAILS);
-    if (SHOULD_LOG_OTP_DEBUG) {
-      console.log(`[OTP] ${accountEmail || 'account'}: listed ${messages.length} recent inbox messages`);
-    }
-
     if (messages.length === 0) {
       return [];
     }
@@ -254,23 +244,8 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           }
         }
 
-        // Only log full diagnostics when debugging locally or in production logs.
-        if (accountEmail === DEBUG_EMAIL || SHOULD_LOG_OTP_DEBUG) {
-          const receivedIso = internalDate
-            ? new Date(parseInt(internalDate, 10)).toISOString()
-            : 'unknown date';
-          console.log(
-            `[DEBUG] Recent inbox email for ${accountEmail}: "${subject}" at ${receivedIso}`
-          );
-        }
-
         // FILTER: Only process emails with subject "OTP for Package Pickup"
         if (!subject.toLowerCase().includes('otp for package pickup')) {
-          if (accountEmail === DEBUG_EMAIL || SHOULD_LOG_OTP_DEBUG) {
-            console.log(
-              `[DEBUG] Skipping email "${subject}" - not an OTP for Package Pickup email`
-            );
-          }
           continue; // Skip this email, move to next one
         }
 
@@ -278,29 +253,6 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
         const bodyText = extractPlainTextFromPayload(payload);
 
         const parsed = parseEmailBody(bodyText);
-
-        // Full email bodies can contain OTPs, so only log them during explicit local debugging.
-        if (accountEmail === DEBUG_EMAIL && process.env.OTP_DEBUG === 'true') {
-          if (!bodyText || bodyText.length === 0) {
-            console.log(
-              `[DEBUG] Warning: Empty email body extracted for ${accountEmail}`
-            );
-          } else {
-            console.log(
-              `[DEBUG] Full email body for ${accountEmail} (subject: "${subject}"):\n` +
-                '----- BODY START -----\n' +
-                bodyText +
-                '\n----- BODY END -----'
-            );
-          }
-
-          if (!parsed.otp) {
-            console.log(
-              `[DEBUG] Warning: No OTP extracted for ${accountEmail}. Body snippet:`,
-              bodyText ? bodyText.substring(0, 300) : '(empty body)'
-            );
-          }
-        }
 
         // Convert internalDate (ms since epoch) to JS Date string
         const receivedTime = internalDate ? new Date(parseInt(internalDate, 10)) : null;
@@ -324,11 +276,6 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     const validResults = results.filter(
       (item) => item.storeName && item.otp && item.timeReceived
     );
-    if (SHOULD_LOG_OTP_DEBUG) {
-      console.log(
-        `[OTP] ${accountEmail || 'account'}: parsed ${validResults.length} valid OTP emails`
-      );
-    }
 
     // Sort newest first by timeReceived
     validResults.sort((a, b) => {
@@ -339,7 +286,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
     return validResults;
   } catch (err) {
     console.error(
-      `[OTP] Error listing Gmail messages for ${accountEmail || 'account'} ` +
+      `Error listing Gmail messages for ${accountEmail || 'account'} ` +
         `(code: ${err && (err.code || err.status)}):`,
       err && err.message ? err.message : err
     );

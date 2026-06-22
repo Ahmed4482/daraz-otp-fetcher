@@ -3,7 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 const open = require('open');
-const readline = require('readline');
 const { exec } = require('child_process');
 
 // If modifying these scopes, delete token.json and re-authorize.
@@ -15,17 +14,6 @@ const CREDENTIALS_PATH = process.env.GOOGLE_CREDENTIALS_PATH
   || (fs.existsSync('/etc/secrets/credentials.json') 
       ? '/etc/secrets/credentials.json' 
       : path.join(__dirname, 'credentials.json'));
-
-// Token path helper - adapts to environment
-const getTokenFilePath = (email) => {
-  const tokenName = `token_${email.replace(/[@.]/g, '_')}.json`;
-  
-  if (process.env.NODE_ENV === 'production') {
-    return `/etc/secrets/${tokenName}`;
-  }
-  
-  return path.join(__dirname, tokenName);
-};
 
 // Account configurations
 const ACCOUNTS = [
@@ -41,7 +29,6 @@ const ACCOUNTS = [
   { email: 'bintesikanderpervez@gmail.com', name: 'HK Digital Empire' },
 ];
 
-// ... rest of your code
 // Store pending OAuth clients (for automatic token exchange)
 // Key: email, Value: { oAuth2Client, resolve, reject, timestamp }
 const pendingAuths = new Map();
@@ -114,10 +101,6 @@ function writeJsonFile(filePath, data) {
  * Load client secrets from a local file and return an OAuth2 client.
  */
 function loadOAuthClient() {
-  console.log(
-    `[AUTH] Loading credentials from: ${CREDENTIALS_PATH} ` +
-      `(exists: ${fs.existsSync(CREDENTIALS_PATH)})`
-  );
   const credentials = readJsonFile(CREDENTIALS_PATH);
   if (!credentials) {
     throw new Error(
@@ -162,7 +145,6 @@ function loadOAuthClient() {
     throw new Error('No redirect URI found. Please configure redirect_uris in credentials.json or set REDIRECT_URI environment variable.');
   }
 
-  console.log(`Using redirect URI: ${redirectUri}`);
   return new google.auth.OAuth2(client_id, client_secret, redirectUri);
 }
 
@@ -273,17 +255,8 @@ async function getAuthorizedClient(email) {
 
   // Load token if it exists
   const tokenPath = getTokenPath(email);
-  const tokenExists = fs.existsSync(tokenPath);
-  console.log(
-    `[AUTH] ${email}: token path ${tokenPath} (exists: ${tokenExists})`
-  );
-
   const token = readJsonFile(tokenPath);
   if (token) {
-    const hasRefresh = Boolean(token.refresh_token);
-    console.log(
-      `[AUTH] ${email}: token loaded (has refresh_token: ${hasRefresh})`
-    );
     oAuth2Client.setCredentials(token);
     return oAuth2Client;
   }
@@ -309,12 +282,6 @@ async function getAuthorizedClient(email) {
 async function getAllAuthorizedClients() {
   const clients = [];
 
-  console.log(
-    `[AUTH] Environment: NODE_ENV=${process.env.NODE_ENV || '(unset)'} ` +
-      `RENDER=${process.env.RENDER || '(unset)'} headless=${IS_HEADLESS_SERVER}`
-  );
-  console.log(`[AUTH] Configured accounts: ${ACCOUNTS.length}`);
-
   for (const account of ACCOUNTS) {
     try {
       const auth = await getAuthorizedClient(account.email);
@@ -324,12 +291,11 @@ async function getAllAuthorizedClients() {
         auth: auth,
       });
     } catch (error) {
-      console.error(`[AUTH] Failed to authenticate ${account.email}:`, error.message);
+      console.error(`Failed to authenticate ${account.email}:`, error.message);
       // Continue with other accounts even if one fails
     }
   }
 
-  console.log(`[AUTH] Authorized ${clients.length}/${ACCOUNTS.length} accounts`);
   return clients;
 }
 
