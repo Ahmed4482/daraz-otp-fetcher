@@ -24,6 +24,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// How many accounts to fetch from Google concurrently. Small enough to avoid a
+// connection burst to Google (which can cause ERR_STREAM_PREMATURE_CLOSE on Render),
+// large enough to stay fast.
+const FETCH_BATCH_SIZE = 4;
+
 // API responses must always be fresh because OTP inbox data changes frequently.
 app.set('etag', false);
 
@@ -280,22 +285,28 @@ app.get('/api/otps', async (req, res) => {
       });
     }
 
-    // Fetch OTPs one account at a time. Processing all accounts in parallel
-    // opens ~20 simultaneous TLS connections to Google from Render, which
-    // triggers ERR_STREAM_PREMATURE_CLOSE. Sequential processing avoids the burst.
+    // Fetch OTPs in small concurrent batches. Full parallelism opens too many
+    // simultaneous TLS connections to Google from Render (which can cause
+    // ERR_STREAM_PREMATURE_CLOSE), while one-at-a-time is slow. Batching keeps
+    // it fast without the connection burst.
     const allOtps = [];
-    for (const clientInfo of clients) {
-      try {
-        const otps = await fetchDarazOtpEmails(
-          clientInfo.auth,
-          clientInfo.email,
-          clientInfo.name
-        );
-        allOtps.push(...otps);
-      } catch (error) {
-        console.error(`Error fetching from ${clientInfo.email}:`, error.message);
-        // Continue with other accounts even if one fails
-      }
+    for (let i = 0; i < clients.length; i += FETCH_BATCH_SIZE) {
+      const batch = clients.slice(i, i + FETCH_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (clientInfo) => {
+          try {
+            return await fetchDarazOtpEmails(
+              clientInfo.auth,
+              clientInfo.email,
+              clientInfo.name
+            );
+          } catch (error) {
+            console.error(`Error fetching from ${clientInfo.email}:`, error.message);
+            return []; // Continue with other accounts even if one fails
+          }
+        })
+      );
+      batchResults.forEach((otps) => allOtps.push(...otps));
     }
 
     // Sort all OTPs by time (newest first)

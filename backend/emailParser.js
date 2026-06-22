@@ -6,10 +6,11 @@
 const { google } = require('googleapis');
 
 // Gmail search parameters
-// Only inspect the three most recent received emails in the inbox
-const SEARCH_QUERY = 'in:inbox';
+// Filter to OTP pickup emails server-side so we only download the messages we
+// actually care about (this also matches forwarded "Fwd: OTP for Package Pickup").
+const SEARCH_QUERY = 'in:inbox subject:"OTP for Package Pickup"';
 
-// Maximum number of emails to fetch (recent 3 only)
+// Maximum number of (matching) emails to fetch per account
 const MAX_EMAILS = 3;
 const GMAIL_API_RETRIES = 3;
 
