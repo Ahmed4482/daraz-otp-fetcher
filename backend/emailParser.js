@@ -18,12 +18,6 @@ const SHOULD_LOG_OTP_DEBUG = true;
 // Maximum number of emails to fetch (recent 3 only)
 const MAX_EMAILS = 3;
 const GMAIL_API_RETRIES = 3;
-const GMAIL_REQUEST_OPTIONS = {
-  headers: {
-    // Render sometimes closes gzip streams early; request an uncompressed body.
-    'Accept-Encoding': 'identity',
-  },
-};
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -218,7 +212,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
           q: SEARCH_QUERY,
           maxResults: MAX_EMAILS,
           labelIds: ['INBOX'], // ensure we only inspect received messages
-        }, GMAIL_REQUEST_OPTIONS),
+        }),
       `message list for ${accountEmail || 'account'}`
     );
 
@@ -243,7 +237,7 @@ async function fetchDarazOtpEmails(auth, accountEmail = null, accountName = null
               userId: 'me',
               id: msg.id,
               format: 'full',
-            }, GMAIL_REQUEST_OPTIONS),
+            }),
           `message fetch for ${accountEmail || 'account'}`
         );
 

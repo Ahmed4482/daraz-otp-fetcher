@@ -18,7 +18,7 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "googleapis": "^144.0.0",
+    "googleapis": "^173.0.0",
     "open": "^9.1.0"
   },
   "engines": {
@@ -26,5 +26,3 @@
     "npm": ">=9.0.0"
   }
 }
-
-
