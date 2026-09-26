@@ -27,6 +27,7 @@ const ACCOUNTS = [
   { email: 'muhammadrraahimsikander@gmail.com', name: 'The pen Heaven' },
   { email: 'darazumotp@gmail.com', name: 'UM Treasures' },
   { email: 'bintesikanderpervez@gmail.com', name: 'HK Digital Empire' },
+  { email: 'scarlettjohn805@gmail.com', name: 'HK Digital Hub (store 4)' },
 ];
 
 // Store pending OAuth clients (for automatic token exchange)
